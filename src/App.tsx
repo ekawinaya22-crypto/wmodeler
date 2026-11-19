@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LandscapeWorkspace } from './components/LandscapeWorkspace';
 import { PortraitDashboard } from './components/PortraitDashboard';
 import { OfflineIndicator } from './components/PWAInstallButton';
+import { STARTUP_AD_URL, StartupAdModal } from './components/StartupAdModal';
 import { parseImportedFile } from './engine/modelImporter';
 import { getBuiltInTextures } from './engine/proceduralTextures';
 import { exportTexturesToTXD } from './engine/rwFormat';
@@ -71,6 +72,54 @@ export default function App() {
 
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const statusTimerRef = useRef<number | null>(null);
+
+  const [showStartupAd, setShowStartupAd] = useState<boolean>(() => {
+    try {
+      const alreadyShown = sessionStorage.getItem('wmodeler_startup_ad_shown') === '1';
+      if (alreadyShown) return false;
+      // Top-level published / Android PWA launch opens the ad directly without any click
+      if (typeof window !== 'undefined' && window.self === window.top) {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissStartupAd = useCallback(() => {
+    try {
+      sessionStorage.setItem('wmodeler_startup_ad_shown', '1');
+    } catch {
+      // ignore storage errors
+    }
+    setShowStartupAd(false);
+  }, []);
+
+  // Automatically open the startup ad URL once without clicking any button when opened outside an iframe
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onPageShow = () => {
+      setShowStartupAd(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+
+    try {
+      const alreadyShown = sessionStorage.getItem('wmodeler_startup_ad_shown') === '1';
+      const isTopLevel = window.self === window.top;
+      if (!alreadyShown && isTopLevel && navigator.onLine !== false) {
+        sessionStorage.setItem('wmodeler_startup_ad_shown', '1');
+        window.location.assign(STARTUP_AD_URL);
+      }
+    } catch {
+      // ignore storage/navigation restrictions
+    }
+
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, []);
 
   const builtInTextures = useMemo(() => getBuiltInTextures(), []);
   const allTextures = useMemo(
@@ -679,9 +728,9 @@ export default function App() {
     return isPhysicalLandscape ? 'landscape' : 'portrait';
   }, [manualView, settings.displayOverride, isPhysicalLandscape]);
 
-  if (activeDisplayMode === 'landscape') {
-    return (
-      <>
+  return (
+    <>
+      {activeDisplayMode === 'landscape' ? (
         <LandscapeWorkspace
           project={activeProject}
           selectedId={selectedId}
@@ -715,107 +764,103 @@ export default function App() {
           onResetScene={handleResetScene}
           statusMessage={statusMessage}
         />
-        <OfflineIndicator />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <PortraitDashboard
-        activeTab={portraitTab}
-        onTabChange={setPortraitTab}
-        projects={projects}
-        activeProject={activeProject}
-        selectedObjectName={selectedObject?.name || null}
-        files={files}
-        textures={allTextures}
-        settings={settings}
-        onUpdateSettings={updateSettings}
-        onEnterWorkspace={handleEnterWorkspace}
-        onCreateProject={handleCreateProject}
-        onDuplicateProject={(id) => {
-          const src = projects.find((p) => p.id === id);
-          if (!src) return;
-          const copy: WModelerProject = {
-            ...src,
-            id: nextId('proj'),
-            name: `${src.name} Copy`,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            objects: cloneObjects(src.objects).map((o) => ({ ...o, id: nextId('obj') })),
-          };
-          setProjects((prev) => [copy, ...prev]);
-          showStatus(`Duplicated ${src.name}`);
-        }}
-        onDeleteProject={(id) => {
-          if (projects.length <= 1) return;
-          const remaining = projects.filter((p) => p.id !== id);
-          setProjects(remaining);
-          if (activeProjectId === id) {
-            setActiveProjectId(remaining[0].id);
-            setSelectedId(remaining[0].objects[0]?.id || null);
-          }
-          showStatus('Deleted project');
-        }}
-        onRenameProject={(id, name) => {
-          setProjects((prev) =>
-            prev.map((p) => (p.id === id ? { ...p, name, updatedAt: Date.now() } : p)),
-          );
-          showStatus(`Renamed to ${name}`);
-        }}
-        onImportModelFile={async (file) => {
-          const kind = await handleImportFile(file);
-          if (kind === 'model') {
-            handleEnterWorkspace();
-          } else {
-            setPortraitTab('textures');
-          }
-        }}
-        onImportTXDFile={async (file) => {
-          await handleImportFile(file);
-        }}
-        onExportTXDArchive={async () => {
-          try {
-            const packList =
-              customTextures.length > 0 ? customTextures : allTextures.slice(0, 8);
-            const txdBytes = await exportTexturesToTXD(packList);
-            const slug =
-              activeProject.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'wmodeler';
-            const blob = new Blob([txdBytes.slice().buffer], {
-              type: 'application/octet-stream',
-            });
-            await handleExportRecord('txd', blob, `${slug}.txd`, {
-              objectCount: activeProject.objects.length,
-              triangleCount: 0,
-              vertexCount: 0,
-            });
-          } catch (err) {
-            showStatus(err instanceof Error ? err.message : 'TXD export failed');
-          }
-        }}
-        onDownloadTexturePNG={async (tex) => {
-          const res = await fetch(tex.dataUrl);
-          const blob = await res.blob();
-          const safe = tex.name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'texture';
-          downloadBlob(blob, `${safe}.png`);
-          showStatus(`Downloaded ${safe}.png`);
-        }}
-        onOpenStoredFile={handleOpenStoredFile}
-        onDownloadStoredFile={handleDownloadStoredFile}
-        onDeleteStoredFile={(id) => {
-          setFiles((prev) => prev.filter((f) => f.id !== id));
-          showStatus('Removed file from storage');
-        }}
-        onUploadTexture={handleUploadTexture}
-        onApplyTextureToSelected={handleApplyTextureToSelected}
-        onDeleteCustomTexture={(id) => {
-          setCustomTextures((prev) => prev.filter((t) => t.id !== id));
-          showStatus('Deleted custom texture');
-        }}
-        onClearCache={handleClearCache}
-        statusMessage={statusMessage}
-      />
+      ) : (
+        <PortraitDashboard
+          activeTab={portraitTab}
+          onTabChange={setPortraitTab}
+          projects={projects}
+          activeProject={activeProject}
+          selectedObjectName={selectedObject?.name || null}
+          files={files}
+          textures={allTextures}
+          settings={settings}
+          onUpdateSettings={updateSettings}
+          onEnterWorkspace={handleEnterWorkspace}
+          onCreateProject={handleCreateProject}
+          onDuplicateProject={(id) => {
+            const src = projects.find((p) => p.id === id);
+            if (!src) return;
+            const copy: WModelerProject = {
+              ...src,
+              id: nextId('proj'),
+              name: `${src.name} Copy`,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              objects: cloneObjects(src.objects).map((o) => ({ ...o, id: nextId('obj') })),
+            };
+            setProjects((prev) => [copy, ...prev]);
+            showStatus(`Duplicated ${src.name}`);
+          }}
+          onDeleteProject={(id) => {
+            if (projects.length <= 1) return;
+            const remaining = projects.filter((p) => p.id !== id);
+            setProjects(remaining);
+            if (activeProjectId === id) {
+              setActiveProjectId(remaining[0].id);
+              setSelectedId(remaining[0].objects[0]?.id || null);
+            }
+            showStatus('Deleted project');
+          }}
+          onRenameProject={(id, name) => {
+            setProjects((prev) =>
+              prev.map((p) => (p.id === id ? { ...p, name, updatedAt: Date.now() } : p)),
+            );
+            showStatus(`Renamed to ${name}`);
+          }}
+          onImportModelFile={async (file) => {
+            const kind = await handleImportFile(file);
+            if (kind === 'model') {
+              handleEnterWorkspace();
+            } else {
+              setPortraitTab('textures');
+            }
+          }}
+          onImportTXDFile={async (file) => {
+            await handleImportFile(file);
+          }}
+          onExportTXDArchive={async () => {
+            try {
+              const packList =
+                customTextures.length > 0 ? customTextures : allTextures.slice(0, 8);
+              const txdBytes = await exportTexturesToTXD(packList);
+              const slug =
+                activeProject.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'wmodeler';
+              const blob = new Blob([txdBytes.slice().buffer], {
+                type: 'application/octet-stream',
+              });
+              await handleExportRecord('txd', blob, `${slug}.txd`, {
+                objectCount: activeProject.objects.length,
+                triangleCount: 0,
+                vertexCount: 0,
+              });
+            } catch (err) {
+              showStatus(err instanceof Error ? err.message : 'TXD export failed');
+            }
+          }}
+          onDownloadTexturePNG={async (tex) => {
+            const res = await fetch(tex.dataUrl);
+            const blob = await res.blob();
+            const safe = tex.name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'texture';
+            downloadBlob(blob, `${safe}.png`);
+            showStatus(`Downloaded ${safe}.png`);
+          }}
+          onOpenStoredFile={handleOpenStoredFile}
+          onDownloadStoredFile={handleDownloadStoredFile}
+          onDeleteStoredFile={(id) => {
+            setFiles((prev) => prev.filter((f) => f.id !== id));
+            showStatus('Removed file from storage');
+          }}
+          onUploadTexture={handleUploadTexture}
+          onApplyTextureToSelected={handleApplyTextureToSelected}
+          onDeleteCustomTexture={(id) => {
+            setCustomTextures((prev) => prev.filter((t) => t.id !== id));
+            showStatus('Deleted custom texture');
+          }}
+          onClearCache={handleClearCache}
+          statusMessage={statusMessage}
+        />
+      )}
+      <StartupAdModal open={showStartupAd} onDismiss={handleDismissStartupAd} />
       <OfflineIndicator />
     </>
   );
