@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181C24" />
+      <stop offset="100%" stop-color="#0E1116" />
+    </linearGradient>
+    <linearGradient id="topFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E40AF" />
+      <stop offset="100%" stop-color="#172554" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <rect x="24" y="24" width="464" height="464" rx="92" fill="none" stroke="#3B82F6" stroke-opacity="0.22" stroke-width="4" />
+  <!-- Isometric 3D Cube -->
+  <polygon points="256,104 392,182 256,260 120,182" fill="url(#topFace)" />
+  <polygon points="120,182 256,260 256,412 120,334" fill="url(#leftFace)" />
+  <polygon points="392,182 256,260 256,412 392,334" fill="url(#rightFace)" />
+  <!-- Wireframe Edges & Axis Gizmo Accent -->
+  <polyline points="120,182 256,260 392,182" fill="none" stroke="#DBEAFE" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="256" y1="260" x2="256" y2="412" stroke="#DBEAFE" stroke-width="7" stroke-linecap="round" />
+  <circle cx="256" cy="260" r="14" fill="#F8FAFC" />
+  <circle cx="256" cy="104" r="9" fill="#93C5FD" />
+  <circle cx="120" cy="182" r="9" fill="#F43F5E" />
+  <circle cx="392" cy="182" r="9" fill="#10B981" />
+</svg>

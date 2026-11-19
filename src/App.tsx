@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LandscapeWorkspace } from './components/LandscapeWorkspace';
 import { PortraitDashboard } from './components/PortraitDashboard';
+import { OfflineIndicator } from './components/PWAInstallButton';
 import { parseImportedFile } from './engine/modelImporter';
 import { getBuiltInTextures } from './engine/proceduralTextures';
 import { exportTexturesToTXD } from './engine/rwFormat';
@@ -680,136 +681,142 @@ export default function App() {
 
   if (activeDisplayMode === 'landscape') {
     return (
-      <LandscapeWorkspace
-        project={activeProject}
-        selectedId={selectedId}
-        onSelectObject={handleSelectObject}
-        onAddPrimitive={handleAddPrimitive}
-        onUpdateObject={handleUpdateObject}
-        onTransformLive={handleTransformLive}
-        onTransformCommit={handleTransformCommit}
-        onDuplicateSelected={handleDuplicateSelected}
-        onDeleteSelected={handleDeleteSelected}
-        onMirrorSelected={handleMirrorSelected}
-        onSnapToFloor={handleSnapToFloor}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={historyPast.length > 0}
-        canRedo={historyFuture.length > 0}
-        settings={settings}
-        onUpdateSettings={updateSettings}
-        textures={allTextures}
-        onSaveProject={handleSaveProject}
-        onImportFile={handleImportFile}
-        onExportRecord={handleExportRecord}
-        onOpenDashboard={() => {
-          setPortraitTab('dashboard');
-          setManualView('manager');
-        }}
-        onOpenSettings={() => {
-          setPortraitTab('settings');
-          setManualView('manager');
-        }}
-        onResetScene={handleResetScene}
-        statusMessage={statusMessage}
-      />
+      <>
+        <LandscapeWorkspace
+          project={activeProject}
+          selectedId={selectedId}
+          onSelectObject={handleSelectObject}
+          onAddPrimitive={handleAddPrimitive}
+          onUpdateObject={handleUpdateObject}
+          onTransformLive={handleTransformLive}
+          onTransformCommit={handleTransformCommit}
+          onDuplicateSelected={handleDuplicateSelected}
+          onDeleteSelected={handleDeleteSelected}
+          onMirrorSelected={handleMirrorSelected}
+          onSnapToFloor={handleSnapToFloor}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyPast.length > 0}
+          canRedo={historyFuture.length > 0}
+          settings={settings}
+          onUpdateSettings={updateSettings}
+          textures={allTextures}
+          onSaveProject={handleSaveProject}
+          onImportFile={handleImportFile}
+          onExportRecord={handleExportRecord}
+          onOpenDashboard={() => {
+            setPortraitTab('dashboard');
+            setManualView('manager');
+          }}
+          onOpenSettings={() => {
+            setPortraitTab('settings');
+            setManualView('manager');
+          }}
+          onResetScene={handleResetScene}
+          statusMessage={statusMessage}
+        />
+        <OfflineIndicator />
+      </>
     );
   }
 
   return (
-    <PortraitDashboard
-      activeTab={portraitTab}
-      onTabChange={setPortraitTab}
-      projects={projects}
-      activeProject={activeProject}
-      selectedObjectName={selectedObject?.name || null}
-      files={files}
-      textures={allTextures}
-      settings={settings}
-      onUpdateSettings={updateSettings}
-      onEnterWorkspace={handleEnterWorkspace}
-      onCreateProject={handleCreateProject}
-      onDuplicateProject={(id) => {
-        const src = projects.find((p) => p.id === id);
-        if (!src) return;
-        const copy: WModelerProject = {
-          ...src,
-          id: nextId('proj'),
-          name: `${src.name} Copy`,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          objects: cloneObjects(src.objects).map((o) => ({ ...o, id: nextId('obj') })),
-        };
-        setProjects((prev) => [copy, ...prev]);
-        showStatus(`Duplicated ${src.name}`);
-      }}
-      onDeleteProject={(id) => {
-        if (projects.length <= 1) return;
-        const remaining = projects.filter((p) => p.id !== id);
-        setProjects(remaining);
-        if (activeProjectId === id) {
-          setActiveProjectId(remaining[0].id);
-          setSelectedId(remaining[0].objects[0]?.id || null);
-        }
-        showStatus('Deleted project');
-      }}
-      onRenameProject={(id, name) => {
-        setProjects((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, name, updatedAt: Date.now() } : p)),
-        );
-        showStatus(`Renamed to ${name}`);
-      }}
-      onImportModelFile={async (file) => {
-        const kind = await handleImportFile(file);
-        if (kind === 'model') {
-          handleEnterWorkspace();
-        } else {
-          setPortraitTab('textures');
-        }
-      }}
-      onImportTXDFile={async (file) => {
-        await handleImportFile(file);
-      }}
-      onExportTXDArchive={async () => {
-        try {
-          const packList =
-            customTextures.length > 0 ? customTextures : allTextures.slice(0, 8);
-          const txdBytes = await exportTexturesToTXD(packList);
-          const slug =
-            activeProject.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'wmodeler';
-          const blob = new Blob([txdBytes.slice().buffer], {
-            type: 'application/octet-stream',
-          });
-          await handleExportRecord('txd', blob, `${slug}.txd`, {
-            objectCount: activeProject.objects.length,
-            triangleCount: 0,
-            vertexCount: 0,
-          });
-        } catch (err) {
-          showStatus(err instanceof Error ? err.message : 'TXD export failed');
-        }
-      }}
-      onDownloadTexturePNG={async (tex) => {
-        const res = await fetch(tex.dataUrl);
-        const blob = await res.blob();
-        const safe = tex.name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'texture';
-        downloadBlob(blob, `${safe}.png`);
-        showStatus(`Downloaded ${safe}.png`);
-      }}
-      onOpenStoredFile={handleOpenStoredFile}
-      onDownloadStoredFile={handleDownloadStoredFile}
-      onDeleteStoredFile={(id) => {
-        setFiles((prev) => prev.filter((f) => f.id !== id));
-        showStatus('Removed file from storage');
-      }}
-      onUploadTexture={handleUploadTexture}
-      onApplyTextureToSelected={handleApplyTextureToSelected}
-      onDeleteCustomTexture={(id) => {
-        setCustomTextures((prev) => prev.filter((t) => t.id !== id));
-        showStatus('Deleted custom texture');
-      }}
-      onClearCache={handleClearCache}
-      statusMessage={statusMessage}
-    />
+    <>
+      <PortraitDashboard
+        activeTab={portraitTab}
+        onTabChange={setPortraitTab}
+        projects={projects}
+        activeProject={activeProject}
+        selectedObjectName={selectedObject?.name || null}
+        files={files}
+        textures={allTextures}
+        settings={settings}
+        onUpdateSettings={updateSettings}
+        onEnterWorkspace={handleEnterWorkspace}
+        onCreateProject={handleCreateProject}
+        onDuplicateProject={(id) => {
+          const src = projects.find((p) => p.id === id);
+          if (!src) return;
+          const copy: WModelerProject = {
+            ...src,
+            id: nextId('proj'),
+            name: `${src.name} Copy`,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            objects: cloneObjects(src.objects).map((o) => ({ ...o, id: nextId('obj') })),
+          };
+          setProjects((prev) => [copy, ...prev]);
+          showStatus(`Duplicated ${src.name}`);
+        }}
+        onDeleteProject={(id) => {
+          if (projects.length <= 1) return;
+          const remaining = projects.filter((p) => p.id !== id);
+          setProjects(remaining);
+          if (activeProjectId === id) {
+            setActiveProjectId(remaining[0].id);
+            setSelectedId(remaining[0].objects[0]?.id || null);
+          }
+          showStatus('Deleted project');
+        }}
+        onRenameProject={(id, name) => {
+          setProjects((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, name, updatedAt: Date.now() } : p)),
+          );
+          showStatus(`Renamed to ${name}`);
+        }}
+        onImportModelFile={async (file) => {
+          const kind = await handleImportFile(file);
+          if (kind === 'model') {
+            handleEnterWorkspace();
+          } else {
+            setPortraitTab('textures');
+          }
+        }}
+        onImportTXDFile={async (file) => {
+          await handleImportFile(file);
+        }}
+        onExportTXDArchive={async () => {
+          try {
+            const packList =
+              customTextures.length > 0 ? customTextures : allTextures.slice(0, 8);
+            const txdBytes = await exportTexturesToTXD(packList);
+            const slug =
+              activeProject.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'wmodeler';
+            const blob = new Blob([txdBytes.slice().buffer], {
+              type: 'application/octet-stream',
+            });
+            await handleExportRecord('txd', blob, `${slug}.txd`, {
+              objectCount: activeProject.objects.length,
+              triangleCount: 0,
+              vertexCount: 0,
+            });
+          } catch (err) {
+            showStatus(err instanceof Error ? err.message : 'TXD export failed');
+          }
+        }}
+        onDownloadTexturePNG={async (tex) => {
+          const res = await fetch(tex.dataUrl);
+          const blob = await res.blob();
+          const safe = tex.name.toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'texture';
+          downloadBlob(blob, `${safe}.png`);
+          showStatus(`Downloaded ${safe}.png`);
+        }}
+        onOpenStoredFile={handleOpenStoredFile}
+        onDownloadStoredFile={handleDownloadStoredFile}
+        onDeleteStoredFile={(id) => {
+          setFiles((prev) => prev.filter((f) => f.id !== id));
+          showStatus('Removed file from storage');
+        }}
+        onUploadTexture={handleUploadTexture}
+        onApplyTextureToSelected={handleApplyTextureToSelected}
+        onDeleteCustomTexture={(id) => {
+          setCustomTextures((prev) => prev.filter((t) => t.id !== id));
+          showStatus('Deleted custom texture');
+        }}
+        onClearCache={handleClearCache}
+        statusMessage={statusMessage}
+      />
+      <OfflineIndicator />
+    </>
   );
 }

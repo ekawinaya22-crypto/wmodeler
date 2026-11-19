@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { PROJECT_TEMPLATES } from '../engine/sceneTemplates';
 import { getRuntimeEnvironmentLabel } from '../platform/capacitorBridge';
+import { PWAInstallButton } from './PWAInstallButton';
 import {
   AppSettings,
   PortraitTab,
@@ -203,13 +204,16 @@ export const PortraitDashboard: React.FC<PortraitDashboardProps> = ({
           </span>
         </div>
 
-        <button
-          onClick={() => onEnterWorkspace()}
-          className="min-h-[40px] px-3.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white flex items-center gap-1.5 whitespace-nowrap shrink-0 active:scale-95 transition-transform"
-        >
-          <Box className="w-4 h-4" />
-          3D Workspace
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <PWAInstallButton variant="compact" />
+          <button
+            onClick={() => onEnterWorkspace()}
+            className="min-h-[40px] px-3.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white flex items-center gap-1.5 whitespace-nowrap shrink-0 active:scale-95 transition-transform"
+          >
+            <Box className="w-4 h-4" />
+            3D Workspace
+          </button>
+        </div>
       </header>
 
       {/* Status Notification */}
@@ -996,14 +1000,17 @@ export const PortraitDashboard: React.FC<PortraitDashboardProps> = ({
                 </div>
               </div>
 
-              {!confirmClearCache ? (
-                <button
-                  onClick={() => setConfirmClearCache(true)}
-                  className="min-h-[44px] px-4 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-semibold text-rose-300"
-                >
-                  Reset Local Projects & Cache
-                </button>
-              ) : (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <PWAInstallButton variant="full" />
+
+                {!confirmClearCache ? (
+                  <button
+                    onClick={() => setConfirmClearCache(true)}
+                    className="min-h-[46px] px-4 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-xs font-semibold text-rose-300"
+                  >
+                    Reset Local Projects & Cache
+                  </button>
+                ) : (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
@@ -1022,6 +1029,7 @@ export const PortraitDashboard: React.FC<PortraitDashboardProps> = ({
                   </button>
                 </div>
               )}
+              </div>
             </div>
           </section>
         )}
