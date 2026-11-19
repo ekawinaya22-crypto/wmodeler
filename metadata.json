@@ -1,0 +1,6 @@
+{
+  "name": "WMODELER",
+  "description": "Mobile-first 3D modeling workspace and project studio built for Android landscape editing and Capacitor native packaging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
